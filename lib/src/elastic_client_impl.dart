@@ -51,12 +51,11 @@ class Client {
     return rs.statusCode == 200;
   }
 
-  Future<bool> updateDoc(
-      String index, String type, String id, Map<String, dynamic> doc) async {
+  Future<bool> updateDoc(String index, String type, String id, Map<String, dynamic> doc) async {
     final pathSegments = [index, type];
     if (id != null) pathSegments.add(id);
     final rs =
-        await _transport.send(new Request('POST', pathSegments, bodyMap: doc));
+    await _transport.send(new Request('POST', pathSegments, bodyMap: doc));
     return rs.statusCode == 200 || rs.statusCode == 201;
   }
 
@@ -66,16 +65,18 @@ class Client {
     for (int start = 0; start < docs.length;) {
       final sub = docs.skip(start).take(batchSize).toList();
       final lines = sub
-          .map((doc) => [
-                {
-                  'index': {
-                    '_index': doc.index,
-                    '_type': doc.type,
-                    '_id': doc.id
-                  }..removeWhere((k, v) => v == null)
-                },
-                doc.doc,
-              ])
+          .map((doc) =>
+      [
+        {
+          'index': {
+            '_index': doc.index,
+            '_type': doc.type,
+            '_id': doc.id
+          }
+            ..removeWhere((k, v) => v == null)
+        },
+        doc.doc,
+      ])
           .expand((list) => list)
           .map(convert.json.encode)
           .map((s) => '$s\n')
@@ -96,21 +97,22 @@ class Client {
     return rs.statusCode == 200 ? 1 : 0;
   }
 
-  Future<int> deleteDocs(String index, Map query) async {
+  Future<int> deleteDocs(String index, Map query, {Map<String, String> params}) async {
     final rs = await _transport.send(new Request(
         'POST', [index, '_delete_by_query'],
-        bodyMap: {'query': query}));
+        bodyMap: {'query': query}, params: params));
     if (rs.statusCode != 200) return 0;
     return rs.bodyAsMap['deleted'] as int ?? 0;
   }
 
   Future<SearchResult> search(String index, String type, Map query,
       {int offset,
-      int limit,
-      @Deprecated("Use 'source' instead") bool fetchSource = false,
-      dynamic source,
-      Map suggest,
-      List<Map> sort}) async {
+        int limit,
+        @Deprecated("Use 'source' instead") bool fetchSource = false,
+        dynamic source,
+        Map suggest,
+        List<Map> sort,
+        Map<String, String> params}) async {
     final path = [index, type, '_search'];
     final map = {
       '_source': source ?? fetchSource,
@@ -122,13 +124,30 @@ class Client {
     };
     map.removeWhere((k, v) => v == null);
     final rs = await _transport.send(new Request('POST', path,
-        params: {'search_type': 'dfs_query_then_fetch'}, bodyMap: map));
+        params: {'search_type': 'dfs_query_then_fetch', if(params != null) ...params}, bodyMap: map));
     if (rs.statusCode != 200) {
       throw new Exception('Failed to search $query');
     }
+    return _searchResultOf(rs);
+  }
+
+  Future<SearchResult> scroll(String scroll, String scrollId) async {
+    final path = ['_search', 'scroll'];
+    final rs = await _transport.send(new Request('POST', path, bodyMap: {
+      "scroll": scroll,
+      "scroll_id": scrollId,
+    }));
+    if (rs.statusCode != 200) {
+      throw new Exception('Failed to scroll $scrollId');
+    }
+    return _searchResultOf(rs);
+  }
+
+  SearchResult _searchResultOf(Response rs) {
     final body = convert.json.decode(rs.body);
     final hitsMap = body['hits'] ?? const {};
     final hitsTotal = hitsMap['total'];
+    final scrollId = body['_scroll_id'];
     int totalCount = 0;
     if (hitsTotal is int) {
       totalCount = hitsTotal;
@@ -138,14 +157,15 @@ class Client {
     final List<Map> hitsList =
         (hitsMap['hits'] as List).cast<Map>() ?? const <Map>[];
     final List<Doc> results = hitsList
-        .map((Map map) => new Doc(
-              map['_id'] as String,
-              map['_source'] as Map,
-              index: map['_index'] as String,
-              type: map['_type'] as String,
-              score: map['_score'] as double,
-              sort: map['sort'] as List<dynamic>,
-            ))
+        .map((Map map) =>
+    new Doc(
+      map['_id'] as String,
+      map['_source'] as Map,
+      index: map['_index'] as String,
+      type: map['_type'] as String,
+      score: map['_score'] as double,
+      sort: map['sort'] as List<dynamic>,
+    ))
         .toList();
     final suggestMap = body['suggest'] as Map ?? const {};
     final suggestHits = suggestMap.map<String, List<SuggestHit>>((k, v) {
@@ -153,29 +173,29 @@ class Client {
       final list = (v as List).cast<Map>();
       final hits = list
           .map((map) {
-            final optionsList = (map['options'] as List).cast<Map>();
-            final options = optionsList?.map((m) {
-              return new SuggestHitOption(
-                m['text'] as String,
-                m['score'] as double,
-                freq: m['freq'] as int,
-                highlighted: m['highlighted'] as String,
-              );
-            })?.toList();
-            return new SuggestHit(
-              map['text'] as String,
-              map['offset'] as int,
-              map['length'] as int,
-              options,
-            );
-          })
+        final optionsList = (map['options'] as List).cast<Map>();
+        final options = optionsList?.map((m) {
+          return new SuggestHitOption(
+            m['text'] as String,
+            m['score'] as double,
+            freq: m['freq'] as int,
+            highlighted: m['highlighted'] as String,
+          );
+        })?.toList();
+        return new SuggestHit(
+          map['text'] as String,
+          map['offset'] as int,
+          map['length'] as int,
+          options,
+        );
+      })
           .where((x) => x != null)
           .toList();
       return new MapEntry('', hits);
     });
     suggestHits.removeWhere((k, v) => v == null);
     return new SearchResult(totalCount, results,
-        suggestHits: suggestHits.isEmpty ? null : suggestHits);
+        suggestHits: suggestHits.isEmpty ? null : suggestHits, scrollId: scrollId);
   }
 }
 
@@ -183,10 +203,12 @@ class SearchResult {
   final int totalCount;
   final List<Doc> hits;
   final Map<String, List<SuggestHit>> suggestHits;
+  final String scrollId;
 
-  SearchResult(this.totalCount, this.hits, {this.suggestHits});
+  SearchResult(this.totalCount, this.hits, {this.suggestHits, this.scrollId});
 
-  Map toMap() => {
+  Map toMap() =>
+      {
         'totalCount': totalCount,
         'hits': hits.map((h) => h.toMap()).toList(),
       };
@@ -233,15 +255,18 @@ abstract class Query {
     return {'bool': map};
   }
 
-  static Map exists(String field) => {
+  static Map exists(String field) =>
+      {
         'exists': {'field': field}
       };
 
-  static Map term(String field, List<String> terms) => {
+  static Map term(String field, List<String> terms) =>
+      {
         'terms': {field: terms}
       };
 
-  static Map prefix(String field, String value) => {
+  static Map prefix(String field, String value) =>
+      {
         'prefix': {field: value},
       };
 
