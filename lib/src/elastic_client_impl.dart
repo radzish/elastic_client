@@ -60,7 +60,7 @@ class Client {
   }
 
   Future<bool> updateDocs(String index, String type, List<Doc> docs,
-      {int batchSize = 100}) async {
+      {int batchSize = 100, Map<String, String> params}) async {
     final pathSegments = [index, type, '_bulk']..removeWhere((v) => v == null);
     for (int start = 0; start < docs.length;) {
       final sub = docs.skip(start).take(batchSize).toList();
@@ -82,7 +82,7 @@ class Client {
           .map((s) => '$s\n')
           .join();
       final rs = await _transport
-          .send(new Request('POST', pathSegments, bodyText: lines));
+          .send(new Request('POST', pathSegments, bodyText: lines, params: params));
       if (rs.statusCode != 200) {
         throw new Exception(
             'Unable to update batch starting with $start. ${rs.statusCode} ${rs.body}');
