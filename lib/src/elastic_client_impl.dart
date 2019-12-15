@@ -38,7 +38,10 @@ class Client {
   }
 
   Future updateIndex(String index, Map<String, dynamic> content) async {
-    await _transport.send(new Request('PUT', [index], bodyMap: content));
+    Response response = await _transport.send(new Request('PUT', [index], bodyMap: content));
+    if(response.statusCode != 200) {
+      throw "error updating index: ${response.statusCode} ${response.body}";
+    }
   }
 
   Future flushIndex(String index) async {
@@ -147,7 +150,7 @@ class Client {
     final body = convert.json.decode(rs.body);
     final hitsMap = body['hits'] ?? const {};
     final hitsTotal = hitsMap['total'];
-    final scrollId = body['_scroll_id'];
+    final scrollId = body['_scroll_id'] as String;
     int totalCount = 0;
     if (hitsTotal is int) {
       totalCount = hitsTotal;
