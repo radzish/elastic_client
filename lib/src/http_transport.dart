@@ -1,10 +1,9 @@
 import 'dart:async';
+import 'dart:convert' as convert;
 
 import 'package:http_client/http_client.dart' as http;
 
 import 'transport.dart';
-
-import 'dart:convert' as convert;
 
 class HttpTransport implements Transport {
   final Uri _uri;
@@ -12,9 +11,12 @@ class HttpTransport implements Transport {
   final Duration _timeout;
   final BasicAuth _basicAuth;
 
-  HttpTransport(this._httpClient, this._uri,
-      {Duration timeout = const Duration(minutes: 1), BasicAuth basicAuth})
-      : _timeout = timeout,
+  HttpTransport(
+    this._httpClient,
+    this._uri, {
+    Duration timeout,
+    BasicAuth basicAuth,
+  })  : _timeout = timeout ?? const Duration(minutes: 1),
         _basicAuth = basicAuth;
 
   @override
@@ -22,8 +24,7 @@ class HttpTransport implements Transport {
     final pathSegments = <String>[]
       ..addAll(_uri.pathSegments ?? const <String>[])
       ..addAll(request.pathSegments ?? const <String>[]);
-    final newUri = _uri.replace(
-        pathSegments: pathSegments, queryParameters: request.params);
+    final newUri = _uri.replace(pathSegments: pathSegments, queryParameters: request.params);
     final rs = await _httpClient
         .send(new http.Request(
           request.method,
@@ -42,8 +43,7 @@ class HttpTransport implements Transport {
 
   Map<String, String> _mergeHeader(Map<String, String> headerToMerge) {
     if (_basicAuth != null) {
-      Map<String, String> headers =
-          Map<String, String>.from(_basicAuth.toMap());
+      Map<String, String> headers = Map<String, String>.from(_basicAuth.toMap());
       headers.addAll(headerToMerge);
       return headers;
     }
@@ -54,7 +54,9 @@ class HttpTransport implements Transport {
 class BasicAuth {
   final String username;
   final String password;
+
   BasicAuth(this.username, this.password);
+
   Map<String, String> toMap() {
     final up = convert.utf8.encode('$username:$password');
     return {'Authorization': 'Basic ${convert.base64Encode(up)}'};
