@@ -115,7 +115,8 @@ class Client {
         dynamic source,
         Map suggest,
         List<Map> sort,
-        Map<String, String> params}) async {
+        Map<String, String> params,
+        Map<String, dynamic> highlight}) async {
     final path = [index, type, '_search'];
     final map = {
       '_source': source ?? fetchSource,
@@ -124,6 +125,8 @@ class Client {
       'size': limit,
       'suggest': suggest,
       'sort': sort,
+      if(highlight != null && highlight.isNotEmpty)
+        'highlight': highlight,
     };
     map.removeWhere((k, v) => v == null);
     final rs = await _transport.send(new Request('POST', path,
