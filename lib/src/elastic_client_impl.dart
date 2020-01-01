@@ -7,11 +7,12 @@ class Doc {
   final String index;
   final String type;
   final String id;
-  final Map doc;
+  final Map<String, dynamic> doc;
   final double score;
   final List<dynamic> sort;
+  final Map<String, dynamic> highlight;
 
-  Doc(this.id, this.doc, {this.index, this.type, this.score, this.sort});
+  Doc(this.id, this.doc, {this.index, this.type, this.score, this.sort, this.highlight});
 
   Map toMap() {
     final map = {
@@ -21,6 +22,7 @@ class Doc {
       '_score': score,
       'doc': doc,
       'sort': sort,
+      'highlight': highlight,
     };
     map.removeWhere((k, v) => v == null);
     return map;
@@ -166,11 +168,12 @@ class Client {
         .map((Map map) =>
     new Doc(
       map['_id'] as String,
-      map['_source'] as Map,
+      map['_source'] as Map<String, dynamic>,
       index: map['_index'] as String,
       type: map['_type'] as String,
       score: map['_score'] as double,
       sort: map['sort'] as List<dynamic>,
+      highlight: map['highlight'] as Map<String, dynamic>,
     ))
         .toList();
     final suggestMap = body['suggest'] as Map ?? const {};
