@@ -46,6 +46,20 @@ class Client {
     }
   }
 
+  Future<void> copyIndex(String source, String target) async {
+    await _transport.send(
+      Request(
+        "POST",
+        ["_reindex"],
+        bodyMap: {
+          "source": {"index": source},
+          "dest": {"index": target}
+        },
+        params: {"refresh": "true"},
+      ),
+    );
+  }
+
   Future flushIndex(String index) async {
     await _transport.send(new Request('POST', [index, '_flush'],
         params: {'wait_if_ongoing': 'true'}));
