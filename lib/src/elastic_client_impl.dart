@@ -134,7 +134,7 @@ class Client {
     final rs = await _transport.send(new Request('POST', path,
         params: {'search_type': 'dfs_query_then_fetch', if(params != null) ...params}, bodyMap: map));
     if (rs.statusCode != 200) {
-      throw new Exception('Failed to search $query');
+      throw new Exception('Failed to search $query, ${rs.body}');
     }
     return _searchResultOf(rs);
   }
