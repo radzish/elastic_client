@@ -3,6 +3,7 @@ import 'dart:convert' as convert;
 
 abstract class Transport {
   Future<Response> send(Request request);
+
   Future close();
 }
 
@@ -13,8 +14,7 @@ class Request {
   final Map<String, String> headers;
   final Map<String, String> params;
 
-  Request._(
-      this.method, this.pathSegments, this.bodyText, this.headers, this.params);
+  Request._(this.method, this.pathSegments, this.bodyText, this.headers, this.params);
 
   factory Request(
     String method,
@@ -24,9 +24,8 @@ class Request {
     Map<String, String> params,
   }) {
     bodyText ??= bodyMap == null ? null : convert.json.encode(bodyMap);
-    final headers =
-        bodyText == null ? null : {'Content-Type': 'application/json'};
-    return new Request._(method, pathSegments, bodyText, headers, params);
+    final Map<String, String> headers = bodyText == null ? {} : {'Content-Type': 'application/json'};
+    return Request._(method, pathSegments, bodyText, headers, params);
   }
 }
 
